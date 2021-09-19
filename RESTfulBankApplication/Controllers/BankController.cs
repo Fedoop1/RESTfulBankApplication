@@ -29,7 +29,7 @@ namespace RESTfulBankApplication.Controllers
                 return NotFound();
             }
 
-            return new JsonResult(new {account.AccountId, account.AccountType});
+            return new JsonResult(new {account.AccountId, account.AccountType, account.MoneyAmount, account.TransactionAmount});
         }
 
         [HttpGet("Accounts/Loans")]
@@ -39,59 +39,74 @@ namespace RESTfulBankApplication.Controllers
         [HttpGet("Accounts/Profiles/{id}")]
         public async Task<IActionResult> GetAccountProfileAsync(int id)
         {
-            var profile = await context.Accounts.FindAsync(id);
+            var profile = await context.AccountProfiles.FindAsync(id);
 
             if (profile is null)
             {
-                return NotFound();
+                return NoContent();
             }
 
-            return new JsonResult(new {profile.AccountId, profile.FirstName, profile.TransactionAmount});
+            return new JsonResult(new
+            {
+                profile.ProfileId, FullName = $"{profile.Account.FirstName}, {profile.Account.LastName}",
+                profile.DateOfBirth, profile.Gender
+            });
         }
 
         [HttpPost("Accounts/Profiles/")]
-        public async Task<IActionResult> CreateAccountProfile([Bind("FirstName,LastName,AccountType")]Account account)
+        public async Task<IActionResult> CreateAccountProfile(AccountProfile accountProfile)
         {
-            if (account is null || !ModelState.IsValid)
+            this.context.AccountProfiles.Add(accountProfile);
+
+            try
             {
-                return BadRequest(account);
+                await this.context.SaveChangesAsync();
             }
-
-            await this.context.Accounts.AddAsync(account);
-
-            await this.context.SaveChangesAsync();
-            return Created($"Accounts/Profiles/{account.AccountId}", account);
+            catch (DbUpdateConcurrencyException)
+            {
+                return BadRequest(accountProfile);
+            }
+            
+            return Created($"Accounts/Profiles/{accountProfile.AccountId}", accountProfile);
         }
 
         [HttpPut("Accounts/Profiles/{id}")]
-        public async Task<IActionResult> UpdateAccountProfile(int id, Account account)
+        public async Task<IActionResult> UpdateAccountProfile(int id)
         {
-            if (account is null || account.AccountId != id || !ModelState.IsValid)
-            {
-                return BadRequest(account);
-            }
+            var account = await context.AccountProfiles.FindAsync(id);
 
             if (!await TryUpdateModelAsync(account, "", 
-                a => a.FirstName, a => a.LastName, a => a.AccountType))
+                a => a.Gender, a => a.DateOfBirth))
             {
                 return BadRequest(account);
             }
 
-            await this.context.SaveChangesAsync();
+            try
+            {
+                await this.context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                BadRequest(account);
+            }
+            
             return Ok();
         }
 
         [HttpPost("Account/Bills/")]
-        public async Task<IActionResult> CreateBill([Bind("BillSum,AccountId")] Bill bill)
+        public async Task<IActionResult> CreateBill(Bill bill)
         {
-            if (bill is null || !ModelState.IsValid)
+            this.context.Bills.Add(bill);
+
+            try
+            {
+                await this.context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
             {
                 return BadRequest(bill);
             }
-
-            await this.context.Bills.AddAsync(bill);
-
-            await this.context.SaveChangesAsync();
+            
             return Created(string.Empty, bill);
         }
 
@@ -101,31 +116,39 @@ namespace RESTfulBankApplication.Controllers
             var payee = await this.context.Bills.FindAsync(id);
             this.context.Bills.Remove(payee);
 
-            await this.context.SaveChangesAsync();
+            try
+            {
+                await this.context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return NoContent();
+            }
+            
             return Ok();
         }
 
         [HttpPost("Accounts/Payee/")]
-        public async Task<IActionResult> CreatePayee([Bind("FirstName,LastName")] Payee payee)
+        public async Task<IActionResult> CreatePayee(Payee payee)
         {
-            if (payee is null || !ModelState.IsValid)
+            this.context.Payees.Add(payee);
+
+            try
+            {
+                await this.context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
             {
                 return BadRequest(payee);
             }
-
-            await this.context.Payees.AddAsync(payee);
-
-            await this.context.SaveChangesAsync();
+            
             return Created(string.Empty, payee);
         }
 
         [HttpPut("Accounts/Payee/{id}")]
-        public async Task<IActionResult> UpdatePayee(int id, Payee payee)
+        public async Task<IActionResult> UpdatePayee(int id)
         {
-            if (payee is null || payee.PayeeId != id || !ModelState.IsValid)
-            {
-                return BadRequest(payee);
-            }
+            var payee = await context.Payees.FindAsync(id);
 
             if (!await TryUpdateModelAsync(payee, "",
                 p => p.FirstName, p => p.LastName))
@@ -133,7 +156,15 @@ namespace RESTfulBankApplication.Controllers
                 return BadRequest(payee);
             }
 
-            await this.context.SaveChangesAsync();
+            try
+            {
+                await this.context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return BadRequest(payee);
+            }
+            
             return Ok();
         }
 
@@ -143,31 +174,38 @@ namespace RESTfulBankApplication.Controllers
             var payee = await this.context.Payees.FindAsync(id);
             this.context.Payees.Remove(payee);
 
-            await this.context.SaveChangesAsync();
+            try
+            {
+                await this.context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return NoContent();
+            }
+            
             return Ok();
         }
 
         [HttpPost("Accounts/fd/")]
-        public async Task<IActionResult> CreateFixedDeposit([Bind("DepositRate,DepositAmount,AccountId")] FixedDeposit fd)
+        public async Task<IActionResult> CreateFixedDeposit(FixedDeposit fd)
         {
-            if (fd is null || !ModelState.IsValid)
+            this.context.FixedDeposits.Add(fd);
+            try
+            {
+                await this.context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
             {
                 return BadRequest(fd);
             }
-
-            await this.context.FixedDeposits.AddAsync(fd);
-
-            await this.context.SaveChangesAsync();
+            
             return Created(string.Empty, fd);
         }
 
         [HttpPut("Accounts/fd/{id}")]
-        public async Task<IActionResult> UpdateFixedDeposit(int id, FixedDeposit fd)
+        public async Task<IActionResult> UpdateFixedDeposit(int id)
         {
-            if (fd is null || fd.DepositId != id || !ModelState.IsValid)
-            {
-                return BadRequest(fd);
-            }
+            var fd = await context.FixedDeposits.FindAsync(id);
 
             if (!await TryUpdateModelAsync(fd, "",
                 f => f.DepositAmount, f => f.DepositRate))
@@ -175,7 +213,15 @@ namespace RESTfulBankApplication.Controllers
                 return BadRequest(fd);
             }
 
-            await this.context.SaveChangesAsync();
+            try
+            {
+                await this.context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return BadRequest(fd);
+            }
+            
             return Ok();
         }
     }
